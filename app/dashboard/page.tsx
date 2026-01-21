@@ -8,7 +8,7 @@ import {
   LogOut, Copy, CreditCard, Wallet, AlertTriangle, 
   Users, MessageCircle, Calendar, Plus, Trash2, Edit, X, 
   Key, Eye, EyeOff, UserCheck, CheckSquare, Square, ClipboardCopy,
-  CheckCircle, Lock, Mail, ExternalLink
+  CheckCircle, Lock, Mail, ExternalLink, TrendingUp, DollarSign, CalendarClock
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -24,12 +24,12 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // Modais de Gestão
+  // Modais
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isCredModalOpen, setIsCredModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Modal de Visualização de Senha (Novo!)
+  // Modal Visualizar Senha
   const [viewingCred, setViewingCred] = useState<any>(null);
 
   // Forms
@@ -42,12 +42,23 @@ export default function DashboardPage() {
 
   const [showPassword, setShowPassword] = useState<{[key: string]: boolean}>({});
 
-  // CONFIGS
+  // --- CONFIGURAÇÕES ---
   const ADMIN_EMAIL = 'junior@stream.com';
   const PIX_KEY = "99981242031"; 
   const PIX_BANK = "PagSeguro";
   const PIX_NAME = "Francisco de Sousa dos Santos Junior";
   const APP_URL = "https://stream-manager-junior.vercel.app"; 
+
+  // --- SEUS CUSTOS (ADMIN) ---
+  const ADMIN_EXPENSES = [
+    { name: 'Netflix', value: 57.80, day: '03', method: 'Cartão' },
+    { name: 'Premiere', value: 29.90, day: '01', method: 'Cartão' },
+    { name: 'Globo Play', value: 14.90, day: '01', method: 'Cartão' },
+    { name: 'HBO Max (ML)', value: 31.43, day: '01', method: 'Cartão' },
+    { name: 'Disney (ML)', value: 19.90, day: '03', method: 'Cartão' },
+    { name: 'Disney (Avulso)', value: 27.99, day: '03', method: 'Cartão' },
+    { name: 'Prime Video', value: 19.90, day: '01', method: 'Cartão' },
+  ];
 
   useEffect(() => {
     const storedUser = localStorage.getItem('stream_user');
@@ -67,12 +78,32 @@ export default function DashboardPage() {
 
   const isAdmin = user?.email === ADMIN_EMAIL || user?.name === 'Junior Admin';
 
+  // --- CÁLCULOS FINANCEIROS ---
+  const calculateFinance = () => {
+    // 1. Receita Total (Soma das mensalidades dos clientes ativos)
+    // Filtra o próprio admin caso ele esteja na lista com valor 0
+    const totalRevenue = subscribersList
+      .filter(sub => sub.name !== 'Junior Admin')
+      .reduce((acc, sub) => acc + Number(sub.plan_total), 0);
+
+    // 2. Custo Total (Soma da sua lista fixa)
+    const totalCost = ADMIN_EXPENSES.reduce((acc, item) => acc + item.value, 0);
+
+    // 3. Lucro
+    const monthlyProfit = totalRevenue - totalCost;
+    const yearlyProfit = monthlyProfit * 12;
+    const margin = totalRevenue > 0 ? (monthlyProfit / totalRevenue) * 100 : 0;
+
+    return { totalRevenue, totalCost, monthlyProfit, yearlyProfit, margin };
+  };
+
+  const finance = calculateFinance();
+
   // --- BUSCAS ---
   const fetchUserData = async (userId: string) => {
     const { data: invData } = await supabase.from('invoices').select('*').eq('subscriber_id', userId).order('due_date', { ascending: false });
     if (invData) setInvoices(invData);
     
-    // Busca credenciais relevantes (Global ou Pessoal)
     const { data: credData } = await supabase.from('credentials').select('*').or(`subscriber_id.is.null,subscriber_id.eq.${userId}`);
     if (credData) setCredentialsList(credData);
     setLoading(false);
@@ -95,17 +126,13 @@ export default function DashboardPage() {
     finally { setLoading(false); }
   };
 
-  // --- LOGICA DE CREDENCIAIS ---
+  // --- HELPERS ---
   const getUniqueServices = () => Array.from(new Set(credentialsList.map(c => c.service_name)));
 
   const getUserDisplayCredentials = () => {
     if (isAdmin) return credentialsList; 
     const userServicesLower = user?.services?.map((s: string) => s.toLowerCase().trim()) || [];
-    
-    const relevantCreds = credentialsList.filter(cred => 
-      userServicesLower.includes(cred.service_name.toLowerCase().trim())
-    );
-
+    const relevantCreds = credentialsList.filter(cred => userServicesLower.includes(cred.service_name.toLowerCase().trim()));
     const finalCreds: any[] = [];
     relevantCreds.forEach(cred => {
       const existingIndex = finalCreds.findIndex(c => c.service_name.toLowerCase() === cred.service_name.toLowerCase());
@@ -121,16 +148,10 @@ export default function DashboardPage() {
   const displayCredentials = getUserDisplayCredentials();
   const availableServices = getUniqueServices();
 
-  // --- AÇÃO: CLIQUE NO SERVIÇO ---
   const handleServiceClick = (serviceName: string) => {
-    // Procura a credencial correspondente na lista já filtrada (displayCredentials)
     const foundCred = displayCredentials.find(c => c.service_name.toLowerCase().trim() === serviceName.toLowerCase().trim());
-    
-    if (foundCred) {
-      setViewingCred(foundCred);
-    } else {
-      alert(`As credenciais para ${serviceName} ainda não foram cadastradas pelo Admin.`);
-    }
+    if (foundCred) setViewingCred(foundCred);
+    else alert(`As credenciais para ${serviceName} ainda não foram cadastradas pelo Admin.`);
   };
 
   // --- AÇÕES ADMIN ---
@@ -217,10 +238,8 @@ export default function DashboardPage() {
       services: formData.services, password_key: finalPass, avatar_color: editingId ? undefined : 'bg-blue-500'
     };
     if (editingId) delete payload.avatar_color;
-    
     if (editingId) await supabase.from('subscribers').update(payload).eq('id', editingId);
     else await supabase.from('subscribers').insert({...payload, avatar_color: 'bg-blue-500'});
-    
     setProcessing(false); setIsUserModalOpen(false); fetchAdminData();
   };
 
@@ -291,6 +310,65 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           
+          {/* NOVA SEÇÃO DE FINANCEIRO (SÓ ADMIN) */}
+          {isAdmin && (
+            <div className="space-y-6">
+               <h2 className="text-xl font-bold text-white flex items-center gap-2"><DollarSign className="text-green-400" /> Financeiro & Lucratividade</h2>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* CARD DE CUSTOS */}
+                  <div className="glass-card p-6 rounded-2xl border border-white/10">
+                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><TrendingUp className="text-red-400" size={18}/> Seus Custos (Fixo)</h3>
+                     <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scroll">
+                        {ADMIN_EXPENSES.map((exp, idx) => (
+                           <div key={idx} className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                              <div>
+                                 <p className="text-white font-medium">{exp.name}</p>
+                                 <p className="text-xs text-gray-500">Dia {exp.day} • {exp.method}</p>
+                              </div>
+                              <p className="text-red-300 font-mono">- R$ {exp.value.toFixed(2)}</p>
+                           </div>
+                        ))}
+                     </div>
+                     <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center">
+                        <p className="text-gray-400 text-sm">Total Despesas</p>
+                        <p className="text-xl font-bold text-red-400">R$ {finance.totalCost.toFixed(2)}</p>
+                     </div>
+                  </div>
+
+                  {/* CARD DE LUCRO */}
+                  <div className="glass-card p-6 rounded-2xl bg-gradient-to-br from-green-900/20 to-emerald-900/10 border border-emerald-500/20">
+                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><CalendarClock className="text-green-400" size={18}/> Resumo de Lucro</h3>
+                     
+                     <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                           <p className="text-gray-300 text-sm">Faturamento Total</p>
+                           <p className="text-green-300 font-mono font-bold">+ R$ {finance.totalRevenue.toFixed(2)}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                           <p className="text-gray-300 text-sm">Total Despesas</p>
+                           <p className="text-red-300 font-mono font-bold">- R$ {finance.totalCost.toFixed(2)}</p>
+                        </div>
+                        <div className="h-px bg-white/10 my-2"></div>
+                        <div className="flex justify-between items-center">
+                           <p className="text-white font-bold">LUCRO MENSAL</p>
+                           <p className="text-2xl font-bold text-emerald-400">R$ {finance.monthlyProfit.toFixed(2)}</p>
+                        </div>
+                        <div className="bg-black/20 p-3 rounded-xl flex justify-between items-center">
+                           <div>
+                              <p className="text-xs text-gray-400 uppercase">Projeção Anual</p>
+                              <p className="text-lg font-bold text-white">R$ {finance.yearlyProfit.toFixed(2)}</p>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-xs text-gray-400 uppercase">Margem</p>
+                              <p className="text-lg font-bold text-blue-400">{finance.margin.toFixed(0)}%</p>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+
           {/* SECÃO CREDENCIAIS */}
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -381,17 +459,11 @@ export default function DashboardPage() {
             </div>
            )}
 
-           {/* LISTA DE SERVIÇOS (CLICÁVEL PARA USUÁRIO) */}
            <div className="glass-card p-6 rounded-2xl">
               <h3 className="text-lg font-bold text-white mb-4">{isAdmin ? 'Todos Serviços' : 'Seus Serviços'}</h3>
               <div className="flex flex-wrap gap-2">
                 {(isAdmin ? ['Netflix', 'HBO', 'Prime', 'Disney+', 'Globo', 'Premiere'] : user.services).map((service: string, idx: number) => (
-                  <button 
-                    key={idx} 
-                    onClick={() => isAdmin ? null : handleServiceClick(service)}
-                    className={`px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 ${!isAdmin && 'hover:bg-blue-600 hover:text-white hover:border-blue-500 cursor-pointer transition-all'}`}
-                    title={!isAdmin ? "Clique para ver a senha" : ""}
-                  >
+                  <button key={idx} onClick={() => isAdmin ? null : handleServiceClick(service)} className={`px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 ${!isAdmin && 'hover:bg-blue-600 hover:text-white hover:border-blue-500 cursor-pointer transition-all'}`} title={!isAdmin ? "Clique para ver a senha" : ""}>
                     {service}
                   </button>
                 ))}
@@ -405,42 +477,19 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
            <div className="glass-card w-full max-w-md p-6 rounded-3xl animate-float border border-blue-500/30 shadow-2xl shadow-blue-900/20">
               <div className="flex justify-between items-start mb-6">
-                <div>
-                   <h3 className="text-2xl font-bold text-white">{viewingCred.service_name}</h3>
-                   <p className="text-sm text-gray-400">Credenciais de Acesso</p>
-                </div>
+                <div><h3 className="text-2xl font-bold text-white">{viewingCred.service_name}</h3><p className="text-sm text-gray-400">Credenciais de Acesso</p></div>
                 <button onClick={() => setViewingCred(null)} className="p-2 bg-white/10 rounded-full text-white hover:bg-white/20"><X size={20} /></button>
               </div>
-
               <div className="space-y-4">
                  <div className="space-y-1">
                     <label className="text-xs text-blue-300 uppercase font-bold tracking-wider">Login / E-mail</label>
-                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/10">
-                       <Mail className="text-gray-400" size={18} />
-                       <code className="flex-1 text-white font-mono select-all text-sm">{viewingCred.login_email}</code>
-                       <button onClick={() => copy(viewingCred.login_email)}><Copy size={16} className="text-gray-400 hover:text-white"/></button>
-                    </div>
+                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/10"><Mail className="text-gray-400" size={18} /><code className="flex-1 text-white font-mono select-all text-sm">{viewingCred.login_email}</code><button onClick={() => copy(viewingCred.login_email)}><Copy size={16} className="text-gray-400 hover:text-white"/></button></div>
                  </div>
-
                  <div className="space-y-1">
                     <label className="text-xs text-blue-300 uppercase font-bold tracking-wider">Senha</label>
-                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/10">
-                       <Key className="text-gray-400" size={18} />
-                       <code className="flex-1 text-white font-mono select-all text-sm">
-                          {showPassword['view'] ? viewingCred.login_password : '••••••••••••'}
-                       </code>
-                       <button onClick={() => setShowPassword(p => ({...p, view: !p.view}))} className="text-gray-400 hover:text-white mx-1">
-                          {showPassword['view'] ? <EyeOff size={16}/> : <Eye size={16}/>}
-                       </button>
-                       <button onClick={() => copy(viewingCred.login_password)}><Copy size={16} className="text-gray-400 hover:text-white"/></button>
-                    </div>
+                    <div className="flex items-center gap-2 bg-black/40 p-3 rounded-xl border border-white/10"><Key className="text-gray-400" size={18} /><code className="flex-1 text-white font-mono select-all text-sm">{showPassword['view'] ? viewingCred.login_password : '••••••••••••'}</code><button onClick={() => setShowPassword(p => ({...p, view: !p.view}))} className="text-gray-400 hover:text-white mx-1">{showPassword['view'] ? <EyeOff size={16}/> : <Eye size={16}/>}</button><button onClick={() => copy(viewingCred.login_password)}><Copy size={16} className="text-gray-400 hover:text-white"/></button></div>
                  </div>
-
-                 <div className="pt-4 flex justify-center">
-                    <a href="https://www.google.com" target="_blank" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-                       <ExternalLink size={14} /> Abrir site do serviço (Google)
-                    </a>
-                 </div>
+                 <div className="pt-4 flex justify-center"><a href="https://www.google.com" target="_blank" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"><ExternalLink size={14} /> Abrir site do serviço (Google)</a></div>
               </div>
            </div>
         </div>
@@ -466,7 +515,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL CREDENCIAIS */}
       {isCredModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="glass-card w-full max-w-lg p-6 rounded-3xl animate-float border border-white/20">
