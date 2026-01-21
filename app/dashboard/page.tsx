@@ -80,20 +80,13 @@ export default function DashboardPage() {
 
   // --- CÁLCULOS FINANCEIROS ---
   const calculateFinance = () => {
-    // 1. Receita Total (Soma das mensalidades dos clientes ativos)
-    // Filtra o próprio admin caso ele esteja na lista com valor 0
     const totalRevenue = subscribersList
       .filter(sub => sub.name !== 'Junior Admin')
       .reduce((acc, sub) => acc + Number(sub.plan_total), 0);
-
-    // 2. Custo Total (Soma da sua lista fixa)
     const totalCost = ADMIN_EXPENSES.reduce((acc, item) => acc + item.value, 0);
-
-    // 3. Lucro
     const monthlyProfit = totalRevenue - totalCost;
     const yearlyProfit = monthlyProfit * 12;
     const margin = totalRevenue > 0 ? (monthlyProfit / totalRevenue) * 100 : 0;
-
     return { totalRevenue, totalCost, monthlyProfit, yearlyProfit, margin };
   };
 
@@ -291,16 +284,23 @@ export default function DashboardPage() {
         <button onClick={logout} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10"><LogOut className="text-gray-300 w-5 h-5" /></button>
       </header>
 
-      {/* DASHBOARD INFO */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-        <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-          <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400"><Wallet size={24} /></div>
-          <div><p className="text-gray-400 text-sm">{isAdmin ? 'Recebido' : 'Total Gasto'}</p><p className="text-2xl font-bold text-white">R$ {(isAdmin ? totalRecebido : totalRecebido + totalPendente).toFixed(2)}</p></div>
-        </div>
+      {/* DASHBOARD INFO - LÓGICA DE EXIBIÇÃO SIMPLIFICADA PARA USUÁRIO */}
+      <div className={`grid grid-cols-1 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-10`}>
+        {/* CARD 1: FINANCEIRO TOTAL (SÓ ADMIN VÊ) */}
+        {isAdmin && (
+          <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400"><Wallet size={24} /></div>
+            <div><p className="text-gray-400 text-sm">Recebido</p><p className="text-2xl font-bold text-white">R$ {totalRecebido.toFixed(2)}</p></div>
+          </div>
+        )}
+
+        {/* CARD 2: PENDENTE (TODOS VEEM) */}
         <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-orange-500/20 rounded-xl text-orange-400"><AlertTriangle size={24} /></div>
           <div><p className="text-gray-400 text-sm">{isAdmin ? 'A Receber' : 'Pendente'}</p><p className="text-2xl font-bold text-white">R$ {totalPendente.toFixed(2)}</p></div>
         </div>
+
+        {/* CARD 3: SERVIÇOS/ASSINANTES (TODOS VEEM) */}
         <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-purple-500/20 rounded-xl text-purple-400"><Users size={24} /></div>
           <div><p className="text-gray-400 text-sm">{isAdmin ? 'Assinantes' : 'Serviços'}</p><p className="text-2xl font-bold text-white">{isAdmin ? subscribersList.length : user.services.length}</p></div>
@@ -515,6 +515,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* MODAL CREDENCIAIS */}
       {isCredModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="glass-card w-full max-w-lg p-6 rounded-3xl animate-float border border-white/20">
